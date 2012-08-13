@@ -1,0 +1,194 @@
+[[Category:File systems]]
+{{Article summary start}}
+{{Article summary text|This page provides basic guidelines for installing the native ZFS Linux kernel module.}}
+{{Article summary heading|Related}}
+{{Article summary wiki|Installing Arch Linux on ZFS}}
+{{Article summary wiki|ZFS on FUSE}}
+{{Article summary end}}
+
+[[Wikipedia:ZFS|ZFS]] is an advanced filesystem created by [[Wikipedia:Sun Microsystems|Sun Microsystems]] (now owned by Oracle) and released for OpenSolaris in November 2005.  Features of ZFS include: pooled storage (integrated volume management -- zpool), [[Wikipedia:Copy-on-write|Copy-on-write]], [[Wikipedia:Snapshot (computer storage)|snapshots]], data integrity verification and automatic repair (scrubbing), [[Wikipedia:http://en.wikipedia.org/wiki/RAID-Z#RAID-Z|RAID-Z]], and a maximum [[Wikipedia:Exabyte|16 Exabyte]] volume size.  ZFS is licensed under the [[Wikipedia:CDDL|Common Development and Distribution License]] (CDDL).
+
+Described as [http://web.archive.org/web/20060428092023/http://www.sun.com/2004-0914/feature/ "The last word in filesystems"] ZFS is stable, fast, secure, and future-proof.  Being licensed under the GPL incompatible CDDL, it is not possible for ZFS to be distributed along with the Linux Kernel. This requirement, however, does not prevent a native Linux kernel module from being developed and distributed by a third party, as is the case with [http://zfsonlinux.org/ zfsonlinux.org].
+
+==Installation==
+
+The ZFS kernel module is available in the [[AUR]] via {{aur|zfs}}.
+
+==Configuration==
+
+ZFS is considered a "zero administration" filesystem by its creators, therefore configuring ZFS is very straight forward. Configuration is done primarily with two commands, {{ic|# zfs}} and {{ic|# zpool}}.
+
+===initramfs hook===
+
+The kernel module must be added to the hooks list in [[Mkinitcpio|mkinitcpio.conf]]:
+
+{{hc|/etc/mkinitcpio.conf|
+...
+HOOKS<nowiki>="base udev autodetect pata scsi sata filesystems usbinput fsck zfs"</nowiki>
+...
+}}
+
+Make sure its placement is last on the list to prevent errors from causing errors when the module is loaded. Such as [[#No hostid found]].
+
+To see all available options for the ZFS hook,
+
+  $ mkiinitcpio -H zfs
+
+Now recreate the ramdisk
+
+  # mkinitcpio -p linux
+
+There should be no errors.
+
+===Add zfs to DAEMONS list===
+
+For ZFS to live by its "zero administration" namesake, the zfs daemon must bee loaded at startup. A benefit to this is that it is not necessary to mount your zpool in {{ic|/etc/fstab}}; the zfs daemon imports and mounts your zfs pool automatically.
+
+{{hc|/etc/rc.conf|
+...
+DAEMONS<nowiki>=(... @syslog-ng zfs dbus ...)</nowiki>
+...
+}}
+
+And now start the daemon if it is not started already
+
+  # rc.d start zfs
+
+===Prepare your drives===
+
+If using storage drives larger than 2TB, you must partition them with gdisk.  gdisk is available in the [extra] repository via {{Pkg|gptfdisk}}.
+
+Use {{ic| # parted --list}} to see a list of all available drives. If any of the storage drives you plan to use show {{ic|Error: /dev/<device>: unrecognised disk label}} when being listed by GNU Parted, then an error will occur when trying to create the pool. The partition tables of the storage drives containing this error will need to be redone.
+
+Create a gpt partition table using the defaults (entire) disk and the default "linux filesystem". It is recommended by the ZFS on linux developers to use the entire disk. See [http://zfsonlinux.org/faq.html ZFS on Linux FAQ].
+
+Once the partition table is set, producing a list of your storage drives with GNU parted should produce similar output:
+
+{{hc|# parted --list|
+...
+
+Model: ATA ST3000DM001-9YN1 (scsi)
+Disk /dev/sdb: 3001GB
+Sector size (logical/physical): 512B/4096B
+Partition Table: gpt
+Disk Flags:
+
+Number  Start   End     Size    File system  Name              Flags
+ 1      1049kB  3001GB  3001GB               Linux filesystem
+
+...
+}}
+
+===Create a storage pool===
+
+Firstly, the [http://zfsonlinux.org/faq.html#WhatDevNamesShouldIUseWhenCreatingMyPool zfs on linux developers recommend] using device ids when creating ZFS storage pools of less than 10 devices. To find the id's for your device, simply
+
+  $ ls -lah /dev/disk/by-id/
+
+The ids should look similar to the following:
+
+  lrwxrwxrwx 1 root root  9 Aug 12 16:26 ata-ST3000DM001-9YN166_S1F0JKRR -> ../../sdc
+  lrwxrwxrwx 1 root root 10 Aug 12 05:30 ata-ST3000DM001-9YN166_S1F0JKRR-part1 -> ../../sdc1
+  lrwxrwxrwx 1 root root  9 Aug 12 16:26 ata-ST3000DM001-9YN166_S1F0JTM1 -> ../../sde
+  lrwxrwxrwx 1 root root 10 Aug 12 05:30 ata-ST3000DM001-9YN166_S1F0JTM1-part1 -> ../../sde1
+  lrwxrwxrwx 1 root root  9 Aug 12 16:26 ata-ST3000DM001-9YN166_S1F0KBP8 -> ../../sdd
+  lrwxrwxrwx 1 root root 10 Aug 12 05:30 ata-ST3000DM001-9YN166_S1F0KBP8-part1 -> ../../sdd1
+  lrwxrwxrwx 1 root root  9 Aug 12 16:26 ata-ST3000DM001-9YN166_S1F0KDGY -> ../../sdb
+  lrwxrwxrwx 1 root root 10 Aug 12 05:30 ata-ST3000DM001-9YN166_S1F0KDGY-part1 -> ../../sdb1
+
+Now finally, create the ZFS pool:
+
+  # zpool create -m <mount> <pool> raidz <ids>
+
+or as an example
+
+  # zpool create -m /mnt/data bigdata raidz ata-ST3000DM001-9YN166_S1F0KDGY-part1 ata-ST3000DM001-9YN166_S1F0JKRR-part1 ata-ST3000DM001-9YN166_S1F0KBP8-part1 ata-ST3000DM001-9YN166_S1F0JTM1-part1
+
+* It is important to use the ids of the partition and not the whole drive.
+
+* create: subcommand to create the pool
+
+* Another important aspect of the above command is the {{ic|-m}} switch to indicate the mount point. If this is not specified, than your pool will be mounted to {{ic|/<pool>}}.
+
+* pool (bigdata): This is the name of the pool. Change it to whatever you like.
+
+* raidz: This is the type of virtual device that will be created from the pool of devices. Raidz is a special implementation of raid5. See [https://blogs.oracle.com/bonwick/entry/raid_z Jeff Bonwick's Blog -- RAID-Z] for more information about raidz.
+
+If the command is successful, there will be no output. Using the {{ic|$ mount}} command will show that you pool is mounted. Using {{ic|# zpool status}} will show that your pool has been created.
+
+At this point it would be good to reboot your computer to make sure your ZFS pool is mounted at boot. It is best to deal with all errors A.S.A.P. before transfering your data. If any errors occur, see [[#Troubleshooting]].
+
+== Usage ==
+
+To see all the commands available in ZFS, use
+
+  $ man zfs
+
+or
+
+  $ man zpool
+
+=== Scrub ===
+
+ZFS pools should be scrubbed at least once a week. To scrub your pool
+
+  # zpool scrub <pool>
+
+To do automatic scrubbing once a week, set the following line in your root crontab
+
+{{hc|# crontab -e|
+...
+30 19 * * 5 zpool scrub <pool>
+...
+}}
+
+Replace {{ic|<pool>}} with the name of your ZFS storage pool.
+
+=== Check zfs pool status ===
+
+To print a nice table with statistics about your ZFS pool, including and read/write errors, use
+
+  # zpool status -v
+
+=== Destroy a storage pool ===
+
+ZFS makes it easy to destroy a mounted storage pool, removing all metadata about the ZFS device. This command destroys any data contained in the pool.
+
+  # zpool destroy <pool>
+
+and now when checking the status
+
+{{hc|# zpool status|no pools available}}
+
+To find the name of your pool, see [[#Check zfs pool status]].
+
+==Troubleshooting==
+
+===No hostid found===
+
+An error that occurs at boot with the following lines appearing before initscript output:
+
+  ZFS: No hostid found on kernel command line or /etc/hostid.
+
+This error occurs because the {{ic|zfs}} hook in {{ic|/etc/mkinitcpio.conf}} is loaded before the filesystem. Move the zfs module hook after {{ic|filesystems}} like so,
+
+{{hc|/etc/mkinitcpio.conf|
+...
+HOOKS<nowiki>="base udev autodetect pata scsi sata filesystems usbinput fsck zfs"</nowiki>
+...
+}}
+
+and regenerate initramfs
+
+  # mkinitcpio -p linux
+
+reboot to verify changes are correct.
+
+==Tips and tricks==
+
+==See also==
+* [http://zfsonlinux.org/ ZFS on Linux]
+* [http://zfsonlinux.org/faq.html ZFS on Linux FAQ]
+* [http://www.freebsd.org/doc/en_US.ISO8859-1/books/handbook/filesystems-zfs.html FreeBSD Handbook -- The Z File System]
+* [http://docs.oracle.com/cd/E19253-01/819-5461/index.html Oracle Solaris ZFS Administration Guide]
+* [http://www.solarisinternals.com/wiki/index.php/ZFS_Troubleshooting_Guide Solaris Internals -- ZFS Troubleshooting Guide]
