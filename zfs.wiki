@@ -22,6 +22,12 @@ ZFS is considered a "zero administration" filesystem by its creators, therefore 
 
 Should you wish to use ZFS on root file system, the kernel module must be added to the hooks list in [[Mkinitcpio|mkinitcpio.conf]]:
 
+To see all available options for the ZFS hook,
+
+  $ mkiinitcpio -H zfs
+
+Now edit the mkinitcpio config,
+
 {{hc|/etc/mkinitcpio.conf|
 ...
 HOOKS<nowiki>="base udev autodetect pata scsi sata filesystems usbinput fsck zfs"</nowiki>
@@ -30,11 +36,7 @@ HOOKS<nowiki>="base udev autodetect pata scsi sata filesystems usbinput fsck zfs
 
 Make sure its placement is last on the list to prevent errors from causing errors when the module is loaded. Such as [[#No hostid found]].
 
-To see all available options for the ZFS hook,
-
-  $ mkiinitcpio -H zfs
-
-Now recreate the ramdisk
+Recreate the ramdisk
 
   # mkinitcpio -p linux
 
@@ -104,19 +106,36 @@ or as an example
 
   # zpool create -m /mnt/data bigdata raidz ata-ST3000DM001-9YN166_S1F0KDGY-part1 ata-ST3000DM001-9YN166_S1F0JKRR-part1 ata-ST3000DM001-9YN166_S1F0KBP8-part1 ata-ST3000DM001-9YN166_S1F0JTM1-part1
 
-* It is important to use the ids of the partition and not the whole drive.
+* '''create''': subcommand to create the pool.
 
-* create: subcommand to create the pool
+* '''pool''': This is the name of the pool. Change it to whatever you like.
 
-* Another important aspect of the above command is the {{ic|-m}} switch to indicate the mount point. If this is not specified, than your pool will be mounted to {{ic|/<pool>}}.
+* '''-m''': The mount point of the pool. If this is not specified, than your pool will be mounted to {{ic|/<pool>}}.
 
-* pool (bigdata): This is the name of the pool. Change it to whatever you like.
+* '''raidz''': This is the type of virtual device that will be created from the pool of devices. Raidz is a special implementation of raid5. See [https://blogs.oracle.com/bonwick/entry/raid_z Jeff Bonwick's Blog -- RAID-Z] for more information about raidz.
 
-* raidz: This is the type of virtual device that will be created from the pool of devices. Raidz is a special implementation of raid5. See [https://blogs.oracle.com/bonwick/entry/raid_z Jeff Bonwick's Blog -- RAID-Z] for more information about raidz.
+* '''ids''': The names of the drives or partions that you want to include into your pool. Get it from {{ic|/dev/disk/by-id}}.
 
 If the command is successful, there will be no output. Using the {{ic|$ mount}} command will show that you pool is mounted. Using {{ic|# zpool status}} will show that your pool has been created.
 
-At this point it would be good to reboot your computer to make sure your ZFS pool is mounted at boot. It is best to deal with all errors A.S.A.P. before transfering your data. If any errors occur, see [[#Troubleshooting]].
+{{hc|# zpool status|
+  pool: bigdata
+ state: ONLINE
+ scan: none requested
+config:
+
+        NAME                                       STATE     READ WRITE CKSUM
+        bigdata                                    ONLINE       0     0     0
+          -0                                       ONLINE       0     0     0
+            ata-ST3000DM001-9YN166_S1F0KDGY-part1  ONLINE       0     0     0
+            ata-ST3000DM001-9YN166_S1F0JKRR-part1  ONLINE       0     0     0
+            ata-ST3000DM001-9YN166_S1F0KBP8-part1  ONLINE       0     0     0
+            ata-ST3000DM001-9YN166_S1F0JTM1-part1  ONLINE       0     0     0
+
+errors: No known data errors
+}}
+
+At this point it would be good to reboot your computer to make sure your ZFS pool is mounted at boot. It is best to deal with all errors A.S.A.P. before transfering your data.
 
 == Usage ==
 
@@ -178,7 +197,7 @@ HOOKS<nowiki>="base udev autodetect pata scsi sata filesystems usbinput fsck zfs
 ...
 }}
 
-and regenerate initramfs
+and regenerate the ramdisk
 
   # mkinitcpio -p linux
 
