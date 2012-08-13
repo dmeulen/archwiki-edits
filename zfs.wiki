@@ -20,7 +20,7 @@ ZFS is considered a "zero administration" filesystem by its creators, therefore 
 
 ===initramfs hook===
 
-The kernel module must be added to the hooks list in [[Mkinitcpio|mkinitcpio.conf]]:
+Should you wish to use ZFS on root file system, the kernel module must be added to the hooks list in [[Mkinitcpio|mkinitcpio.conf]]:
 
 {{hc|/etc/mkinitcpio.conf|
 ...
