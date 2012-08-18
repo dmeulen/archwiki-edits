@@ -18,29 +18,29 @@ The ZFS kernel module is available in the [[AUR]] via {{aur|zfs}}.
 
 ZFS is considered a "zero administration" filesystem by its creators, therefore configuring ZFS is very straight forward. Configuration is done primarily with two commands, {{ic|# zfs}} and {{ic|# zpool}}.
 
-===initramfs hook===
+===mkinitramfs hook===
 
-Should you wish to use ZFS on root file system, the kernel module must be added to the hooks list in [[Mkinitcpio|mkinitcpio.conf]]:
+If you are using ZFS on your root filesystem, then you will need to add the zfs hook to [[Mkinitcpio|mkinitcpio.conf]]. If you not using ZFS for your root filesystem, then you do not need to add the ZFS hook.
 
-To see all available options for the ZFS hook,
+You will need to change your [[kernel parameters]] to include the dataset you want to boot. You can use <code>zfs=bootfs</code> to use the ZFS bootfs (set via <code>zpool set bootfs=rpool/ROOT/arch rpool</code>) or you can set the [[kernel parameters]] to <code>zfs=<pool>/<dataset></code> to boot directly from a ZFS dataset.
 
-  $ mkiinitcpio -H zfs
+To see all available options for the ZFS hook:
 
-Now edit the mkinitcpio config,
+  $ mkinitcpio -H zfs
+
+To use the mkinitcpio hook, you will need to add <code>zfs</code> to your <code>HOOKS</code> in <code>/etc/mkinitcpio.conf</code>:
 
 {{hc|/etc/mkinitcpio.conf|
 ...
-HOOKS<nowiki>="base udev autodetect pata scsi sata filesystems usbinput fsck zfs"</nowiki>
+HOOKS<nowiki>="base udev autodetect pata scsi sata encrypt zfs filesystems"</nowiki>
 ...
 }}
 
-Make sure its placement is last on the list to prevent errors from causing errors when the module is loaded. Such as [[#No hostid found]].
+It is important to place this after any hooks which are needed to prepare the drive before it is mounted. For example, if your ZFS volume is encrypted, then you will need to place encrypt before the zfs hook to unlock it first.
 
 Recreate the ramdisk
 
   # mkinitcpio -p linux
-
-There should be no errors.
 
 ===Add zfs to DAEMONS list===
 
@@ -183,25 +183,17 @@ To find the name of your pool, see [[#Check zfs pool status]].
 
 ==Troubleshooting==
 
-===No hostid found===
+=== No hostid found ===
 
 An error that occurs at boot with the following lines appearing before initscript output:
 
   ZFS: No hostid found on kernel command line or /etc/hostid.
 
-This error occurs because the {{ic|zfs}} hook in {{ic|/etc/mkinitcpio.conf}} is loaded before the filesystem. Move the zfs module hook after {{ic|filesystems}} like so,
+This warning occurs because the ZFS module does not have access to the spl hosted. There are two solutions, for this. You can either place your spl hostid in the [[kernel parameters]] in your boot loader. For example, adding <code>spl_hostid=0x00bab10c</code>.
 
-{{hc|/etc/mkinitcpio.conf|
-...
-HOOKS<nowiki>="base udev autodetect pata scsi sata filesystems usbinput fsck zfs"</nowiki>
-...
-}}
-
-and regenerate the ramdisk
+The other solution is to make sure that there is a hostid in <code>/etc/hostid</code>, and then regenerate the initramfs image. Which will copy the hostid into the initramfs image.
 
   # mkinitcpio -p linux
-
-reboot to verify changes are correct.
 
 ==Tips and tricks==
 
