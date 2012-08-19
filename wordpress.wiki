@@ -1,4 +1,4 @@
-[[Category:File systems]]
+[[Category:Web Server]]
 {{Article summary start}}
 {{Article summary text|Wordpress is an easy to setup and administer FLOSS content management system featuring a strong and vibrant community with thousands of plugins and themes.}}
 {{Article summary heading|Related}}
