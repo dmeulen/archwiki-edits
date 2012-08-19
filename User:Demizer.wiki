@@ -1,0 +1,3 @@
+== Hello and welcome ==
+
+I have been a fulltime Arch user since mid 2010 and run Arch on all my systems. I am also a machinist by trade, and a hobbyist programmer by night. You can find my webhost at http://demizerone.com. --~~~~
