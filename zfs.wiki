@@ -14,6 +14,61 @@ Described as [http://web.archive.org/web/20060428092023/http://www.sun.com/2004-
 
 The ZFS kernel module is available in the [[AUR]] via {{aur|zfs}}.
 
+===Unofficial repository===
+
+For automatic updates with prebuilt x86_64 packages, it is possible to add the [http://demizerone.com/archzfs "archzfs"] signed repository to <code>pacman.conf</code>,
+
+{{bc|<nowiki>
+[archzfs]
+SigLevel = Required DatabaseOptional TrustedOnly
+Server = http://demizerone.com/$repo/$arch</nowiki>
+}}
+
+{{note|This repository does not yet support i686.}}
+
+The repository and packages are signed with the maintainer's PGP key which is verifiable here: http:demizerone.com/archzfs. This key is not signed by any of the master keys, so it will need to be locally signed and added to the keyring trust.  See [[pacman-key]].
+
+Next add the maintainer's key:
+
+    # pacman-key -r 0EE7A126
+
+and now locally sign the key
+
+    # pacman-key --lsign-key
+
+Once the key has been signed, it is now possible to update the package database,
+
+    # pacman -Syy
+
+and install ZFS,
+
+    # pacman -S zfs
+
+{{note|The ZFS and SPL kernel modules are tied to a specific kernel version. It would not be possible to apply any new kernel updates until the updated ZFS package is available.}}
+
+===systemd===
+
+ZFS on Linux does not yet support a native systemd service. The Arch ZFS
+package maintainer is actively working to solve this issue.
+
+The current ZFS package is still dependent on the old init system, but it is still possible to setup ZFS on a system with systemd.
+
+You must have the {{Pkg|initscripts}} package installed.
+
+Edit <code>/etc/rc.conf</code> and add the zfs daemon to the list,
+
+    DAEMONS=(syslog-ng network crond zfs)
+
+and that's it! It is now possible to start the ZFS service,
+
+    rc.d start zfs
+
+or
+
+    systemctl status zfs.service
+
+or you can just restart.
+
 ==Configuration==
 
 ZFS is considered a "zero administration" filesystem by its creators, therefore configuring ZFS is very straight forward. Configuration is done primarily with two commands, {{ic|zfs}} and {{ic|zpool}}.
