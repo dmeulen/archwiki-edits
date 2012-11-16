@@ -16,7 +16,7 @@ The ZFS kernel module is available in the [[AUR]] via {{aur|zfs}}.
 
 ==Configuration==
 
-ZFS is considered a "zero administration" filesystem by its creators, therefore configuring ZFS is very straight forward. Configuration is done primarily with two commands, {{ic|# zfs}} and {{ic|# zpool}}.
+ZFS is considered a "zero administration" filesystem by its creators, therefore configuring ZFS is very straight forward. Configuration is done primarily with two commands, {{ic|zfs}} and {{ic|zpool}}.
 
 ===mkinitramfs hook===
 
