@@ -1,0 +1,134 @@
+[[Category:Getting and installing Arch]]
+{{Article summary start}}
+{{Article summary text|This page provides basic guidelines for installing arch on ZFS root.}}
+{{Article summary heading|Related}}
+{{Article summary wiki|ZFS}}
+{{Article summary wiki|ZFS on FUSE}}
+{{Article summary end}}
+
+This tutorial will show you how to install your root partition (/) of Arch Linux on ZFS.
+
+== Installing Arch Linux on a regular filesystem ==
+1. Install Arch Linux to wherever you want with the default partition settings, select base-devel when selecting the packages to install, select '''[[syslinux]]''' as the bootloader, and boot into your new install. <br/>
+2. Install some applications that we will be using:
+ # pacman -S git pbzip2
+
+3. Install the {{AUR|spl}} and {{AUR|zfs}} modules from the [[AUR]].
+
+=== Configuring the environment ===
+1. Add the '''zfs''' hook to your '''HOOKS''' array in '''/etc/mkinitcpio.conf''' before '''filesystems''' and after '''sata''', and make a new initramfs with '''mkinitcpio'''.
+ # vim /etc/mkinitcpio.conf
+ HOOKS="...sata zfs filesytems ..."
+
+ # mkinitcpio -p linux
+
+2. Edit your fstab to only mount things not managed by ZFS (/boot, swap, cdrom?)
+ # vim /etc/fstab
+
+3. Add '''zfs''' to your '''DAEMONS''' array in '''/etc/rc.conf''':
+ # vim /etc/rc.conf
+ DAEMONS="syslog-ng zfs network ..."
+
+and that's it for the setup portion.
+
+=== Backing up Arch Linux ===
+Make a temporary directory to bind '''/''' to only backup the / without any other mountpoints:
+ # mkdir /tmp/zfs
+ # mount -o bind / /tmp/zfs
+ # mount -o bind /boot /tmp/zfs/boot
+ # cd /tmp/zfs
+ # tar --exclude arch-zfs.tar --exclude var/cache/pacman/pkg -cvpf arch-zfs.tar .
+
+Compress the tarball with '''[[pbzip2]]''' (dont use [[bzip2]].. it will take a much longer time since it's single-threaded, use pbzip2 if you have a multithreaded system)
+ # pbzip2 arch-zfs.tar
+
+Save this file somewhere because we will be moving it to our new installation afterwards ('''arch-zfs.tar.bz2''')
+
+== New install with ZFS as the filesystem ==
+
+In order to partition the system, I was using '''System Rescue CD v2.5.1'''. The reason I'm using 2.5.1 is because it's the last version that had the
+native ZFS on Linux modules. Any version before or later does not have them. Since the link for 2.5.1 was removed from the author's website, I recommend you
+to use the Gentoo Live DVD 2012. http://torrents.gentoo.org/ , download the `livedvd-amd64-multilib-2012.1`. As of the release of Sabayon 9, the Sabayon liveDVD can be used for this purpose. While ZFS support exists on all editions, the most rich application suite exists in their KDE release, making it likely the most convenient for those who don't mind the added iso size.
+
+{{Note|If anyone knows of another live cd that like sysresccd that has the ZFS on Linux modules, definitely feel free to add it here}}
+
+=== Partitioning ===
+Our system will be using GPT as the base and extlinux as the bootloader.
+
+Let's create a directory to hold out zfs pool
+ # mkdir /mnt/pool
+
+The layout will look like this:
+ /dev/sda1 8300 Linux FS 250M # This will be our /boot partition
+ /dev/sda2 8200 Linux Swap <YOUR_RAM * 1.5> # or w/e calculations you use
+ /dev/sda3 bf01 Rest of Disk # This will be the ZFS pool
+
+{{Warning|You cannot put the swap inside the ZFS pool yet because it will have problems. This will probably be fixed in a future upstream version.}}
+
+# Format the '''/boot''' partition as ext4 (or ext2-3)
+ # mkfs.ext4 /dev/sda1
+
+# Make the swap and turn it on
+ # mkswap /dev/sda2
+ # swapon
+
+Load up the spl/zfs modules (if needed)
+ # modprobe spl zfs
+
+Create ZFS Pool and Mountpoints
+ # zpool create -o ashift=12 -o cachefile= -O normalization=formD -R /mnt/pool rpool /dev/sda3
+ # zfs create -o mountpoint=none rpool/ROOT
+ # zfs create -o mountpoint=/ rpool/ROOT/arch
+ # zfs create -o mountpoint=/home rpool/HOME
+ # zfs create -o mountpoint=/root rpool/HOME/root
+
+Mount your '''/boot''' partition
+ # mkdir /mnt/pool/boot
+ # mount /dev/sda1 /mnt/pool/boot
+
+Move the '''arch-zfs.tar.bz2''' file to your system. You can use scp if it's over the network, or a flash drive if you are within walking distance.
+ # scp /arch-zfs.tar.bz2 root@<ip_of_new_computer>:/mnt/pool
+
+Extract the Arch backup (Preloaded with ZFS modules and configured for ZFS)
+ # cd /mnt/pool
+ # tar -xjpvf arch-zfs.tar.bz2 .
+
+=== Install Extlinux bootloader ===
+Bind a few mountpoints in the chroot env before chroot so that '''[[extlinux]]''' can find the correct device
+ # mount --bind /proc ./proc
+ # mount --bind /dev ./dev
+ # mount --bind /sys ./sys
+ # env -i HOME=/root TERM=$TERM chroot . /bin/bash --login
+
+ # The below commands are executed within the chroot environment
+
+ # mkdir /boot/extlinux
+ # extlinux --install /boot/extlinux
+
+Set correct boot flags in the [[GPT]] legacy bios and then flash gptmbr
+ # sgdisk /dev/sda --attributes=1:set:2
+ # sgdisk /dev/sda --atributes=1:show
+ # dd count=1 bs=440 conv=notrunc if=/usr/lib/syslinux/gptmbr.bin of=/dev/sda
+
+Make an '''extlinux.conf'''
+ # cd /boot/extlinux
+ # vim extlinux.conf
+
+Inside '''extlinux.conf''' put the following
+
+ PROMPT 0
+ TIMEOUT 50
+ UI menu.c32
+
+ MENU TITLE Boot Menu
+ DEFAULT arch
+
+ LABEL Arch
+     MENU LABEL Arch Linux
+     LINUX /vmlinuz-linux
+     INITRD /initramfs-linux.img
+     APPEND zfs=rpool/ROOT/arch zfs_force=1
+
+and save it.
+
+That's it, restart your computer and you should be inside Arch on ZFS :)!
