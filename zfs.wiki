@@ -6,7 +6,7 @@
 {{Article summary wiki|ZFS on FUSE}}
 {{Article summary end}}
 
-[[Wikipedia:ZFS|ZFS]] is an advanced filesystem created by [[Wikipedia:Sun Microsystems|Sun Microsystems]] (now owned by Oracle) and released for OpenSolaris in November 2005.  Features of ZFS include: pooled storage (integrated volume management -- zpool), [[Wikipedia:Copy-on-write|Copy-on-write]], [[Wikipedia:Snapshot (computer storage)|snapshots]], data integrity verification and automatic repair (scrubbing), [[Wikipedia:http://en.wikipedia.org/wiki/RAID-Z#RAID-Z|RAID-Z]], and a maximum [[Wikipedia:Exabyte|16 Exabyte]] volume size.  ZFS is licensed under the [[Wikipedia:CDDL|Common Development and Distribution License]] (CDDL).
+[[Wikipedia:ZFS|ZFS]] is an advanced filesystem created by [[Wikipedia:Sun Microsystems|Sun Microsystems]] (now owned by Oracle) and released for OpenSolaris in November 2005.  Features of ZFS include: pooled storage (integrated volume management -- zpool), [[Wikipedia:Copy-on-write|Copy-on-write]], [[Wikipedia:Snapshot (computer storage)|snapshots]], data integrity verification and automatic repair (scrubbing), [[Wikipedia:RAID-Z|RAID-Z]], and a maximum [[Wikipedia:Exabyte|16 Exabyte]] volume size.  ZFS is licensed under the [[Wikipedia:CDDL|Common Development and Distribution License]] (CDDL).
 
 Described as [http://web.archive.org/web/20060428092023/http://www.sun.com/2004-0914/feature/ "The last word in filesystems"] ZFS is stable, fast, secure, and future-proof.  Being licensed under the GPL incompatible CDDL, it is not possible for ZFS to be distributed along with the Linux Kernel. This requirement, however, does not prevent a native Linux kernel module from being developed and distributed by a third party, as is the case with [http://zfsonlinux.org/ zfsonlinux.org] (ZOL).
 
@@ -14,60 +14,56 @@ Described as [http://web.archive.org/web/20060428092023/http://www.sun.com/2004-
 
 The ZFS kernel module is available in the [[AUR]] via {{aur|zfs}}.
 
+{{note|The ZFS and SPL kernel modules are tied to a specific kernel version. It would not be possible to apply any kernel updates until updated packages are uploaded to AUR or the archzfs repository.}}
+
 ===Unofficial repository===
 
-For automatic updates with prebuilt x86_64 packages, it is possible to add the [http://demizerone.com/archzfs "archzfs"] signed repository to <code>pacman.conf</code>,
+For fast and effortless installation and updates, the [http://demizerone.com/archzfs "archzfs"] signed repository is available to add to your <code>pacman.conf</code>:
 
-{{bc|<nowiki>
+{{hc|/etc/pacman.conf|<nowiki>
 [archzfs]
-SigLevel = Required DatabaseOptional TrustedOnly
-Server = http://demizerone.com/$repo/$arch</nowiki>
+Server = http://demizerone.com/$repo/core/$arch</nowiki>
 }}
 
 {{note|This repository does not yet support i686.}}
 
-The repository and packages are signed with the maintainer's PGP key which is verifiable here: http:demizerone.com/archzfs. This key is not signed by any of the master keys, so it will need to be locally signed and added to the keyring trust.  See [[pacman-key]].
+The repository and packages are signed with the maintainer's PGP key which is verifiable here: http://demizerone.com. This key is not trusted by any of the Arch Linux master keys, so it will need to be locally signed before use. See [[pacman-key]].
 
-Next add the maintainer's key:
+Add the maintainer's key,
 
     # pacman-key -r 0EE7A126
 
-and now locally sign the key
+and locally sign to add it to the system's trust database,
 
-    # pacman-key --lsign-key
+    # pacman-key --lsign-key 0EE7A126
 
 Once the key has been signed, it is now possible to update the package database,
 
     # pacman -Syy
 
-and install ZFS,
+and install ZFS packages:
 
-    # pacman -S zfs
+    # pacman -S archzfs
 
-{{note|The ZFS and SPL kernel modules are tied to a specific kernel version. It would not be possible to apply any new kernel updates until the updated ZFS package is available.}}
+===Archzfs testing repository===
 
-===systemd===
+If you have the testing repository active in {{ic|pacman.conf}} then it is possible to use the archzfs repository that tracks the testing kernel.
 
-ZFS on Linux does not yet support a native systemd service. The Arch ZFS
-package maintainer is actively working to solve this issue.
+{{hc|# /etc/pacman.conf|<nowiki>
+[archzfs]
+Server = http://demizerone.com/$repo/testing/$arch</nowiki>
+}}
 
-The current ZFS package is still dependent on the old init system, but it is still possible to setup ZFS on a system with systemd.
+===Archiso tracking repository===
 
-You must have the {{Pkg|initscripts}} package installed.
+ZFS can easily be used from within the archiso live environment by using the special archiso tracking repository for ZFS. This repository makes it easy to install Arch Linux on a root ZFS filesystem, or to mount ZFS pools from within an archiso live environment using an up-to-date live medium. To use this repository from the live environment, add the following server line to pacman.conf:
 
-Edit <code>/etc/rc.conf</code> and add the zfs daemon to the list,
+{{hc|/etc/pacman.conf|<nowiki>
+[archzfs]
+Server = http://demizerone.com/$repo/archiso/$arch</nowiki>
+}}
 
-    DAEMONS=(syslog-ng network crond zfs)
-
-and that's it! It is now possible to start the ZFS service,
-
-    rc.d start zfs
-
-or
-
-    systemctl status zfs.service
-
-or you can just restart.
+This repository and packages are also signed, so the key must be locally signed following the steps listed in the previous section before use. For a guide on how to install Arch Linux on to a root ZFS filesystem, see [[Installing Arch Linux on ZFS]].
 
 ==Configuration==
 
@@ -75,7 +71,7 @@ ZFS is considered a "zero administration" filesystem by its creators, therefore 
 
 ===mkinitramfs hook===
 
-If you are using ZFS on your root filesystem, then you will need to add the zfs hook to [[Mkinitcpio|mkinitcpio.conf]]. If you are not using ZFS for your root filesystem, then you do not need to add the ZFS hook.
+If you are using ZFS on your root filesystem, then you will need to add the ZFS hook to [[Mkinitcpio|mkinitcpio.conf]]. If you are not using ZFS for your root filesystem, then you do not need to add the ZFS hook.
 
 You will need to change your [[kernel parameters]] to include the dataset you want to boot. You can use <code>zfs=bootfs</code> to use the ZFS bootfs (set via <code>zpool set bootfs=rpool/ROOT/arch rpool</code>) or you can set the [[kernel parameters]] to <code>zfs=<pool>/<dataset></code> to boot directly from a ZFS dataset.
 
@@ -87,9 +83,11 @@ To use the mkinitcpio hook, you will need to add <code>zfs</code> to your <code>
 
 {{hc|/etc/mkinitcpio.conf|
 ...
-HOOKS<nowiki>="base udev autodetect pata scsi sata encrypt zfs filesystems"</nowiki>
+HOOKS<nowiki>="base udev autodetect modconf encrypt zfs filesystems usbinput"</nowiki>
 ...
 }}
+
+{{note|It is not necessary to use the "fsck" hook with ZFS. ZFS automatically fixes any errors that occur within the filesystem. However, if the hook is required for another filesystem used on the system, such as ext4, the current ZFS packaging implementation does not yet properly handle fsck requests from mkinitcpio and an error is produced when generating a new ramdisk.}}
 
 It is important to place this after any hooks which are needed to prepare the drive before it is mounted. For example, if your ZFS volume is encrypted, then you will need to place encrypt before the zfs hook to unlock it first.
 
@@ -97,9 +95,22 @@ Recreate the ramdisk
 
   # mkinitcpio -p linux
 
-===Add zfs to DAEMONS list===
+===Automatic Start===
 
 For ZFS to live by its "zero administration" namesake, the zfs daemon must bee loaded at startup. A benefit to this is that it is not necessary to mount your zpool in {{ic|/etc/fstab}}; the zfs daemon imports and mounts your zfs pool automatically.
+
+==Systemd==
+
+Enable the service so it is automatically started at boot time
+
+  # systemctl enable zfs.service
+
+To manually start the daemon
+
+  # systemctl start zfs.service
+
+==Initscripts==
+Add zfs to DAEMONS list
 
 {{hc|/etc/rc.conf|
 ...
@@ -148,7 +159,7 @@ or as an example
 
 * '''raidz''': This is the type of virtual device that will be created from the pool of devices. Raidz is a special implementation of raid5. See [https://blogs.oracle.com/bonwick/entry/raid_z Jeff Bonwick's Blog -- RAID-Z] for more information about raidz.
 
-* '''ids''': The names of the drives or partions that you want to include into your pool. Get it from {{ic|/dev/disk/by-id}}.
+* '''ids''': The names of the drives or partitions that you want to include into your pool. Get it from {{ic|/dev/disk/by-id}}.
 
 If the command is successful, there will be no output. Using the {{ic|$ mount}} command will show that you pool is mounted. Using {{ic|# zpool status}} will show that your pool has been created.
 
@@ -169,7 +180,7 @@ config:
 errors: No known data errors
 }}
 
-At this point it would be good to reboot your computer to make sure your ZFS pool is mounted at boot. It is best to deal with all errors A.S.A.P. before transfering your data.
+At this point it would be good to reboot your computer to make sure your ZFS pool is mounted at boot. It is best to deal with all errors before transferring your data.
 
 == Usage ==
 
@@ -215,6 +226,9 @@ and now when checking the status
 
 To find the name of your pool, see [[#Check zfs pool status]].
 
+=== Export a storage pool ===
+
+If you are going to use the pool in a different system, or are doing
 ==Troubleshooting==
 
 === does not contain an EFI label ===
@@ -237,9 +251,79 @@ The other solution is to make sure that there is a hostid in <code>/etc/hostid</
 
   # mkinitcpio -p linux
 
-==Tips and tricks==
+== Tips and tricks ==
 
-==See also==
+=== Emergency chroot repair with archzfs ===
+
+Here is how to use the archiso to get into your ZFS filesystem for maintenance.
+
+Boot the latest archiso and bring up your network
+
+    # wifi-menu
+    # ip link set eth0 up
+
+Test the network connection
+
+    # ping google.com
+
+Sync the pacman package database
+
+    # pacman -Syy
+
+(optional) Install your favorite text editor
+
+    # pacman -S vim
+
+Add archzfs archiso repository to {{ic|pacman.conf}}
+
+{{hc|/etc/pacman.conf|<nowiki>
+[archzfs]
+Server = http://demizerone.com/$repo/archiso/$arch</nowiki>}}
+
+Sync the pacman package database
+
+    # pacman -Syy
+
+Install the ZFS package group
+
+    # pacman -S archzfs
+
+Load the ZFS kernel modules
+
+    # modprobe zfs
+
+Import your pool
+
+    # zpool import -a -R /mnt
+
+Mount your boot partitions (if you have them)
+
+    # mount /dev/sda2 /mnt/boot
+    # mount /dev/sda1 /mnt/boot/efi
+
+Chroot into your zfs filesystem
+
+    # arch-chroot /mnt /bin/bash
+
+Check your kernel version
+
+    # pacman -Qi linux
+    # uname -r
+
+uname will show the kernel version of the archiso. If they are different, you will need to run depmod (in the chroot) with the correct kernel version of your chroot installation:
+
+    # depmod -a 3.6.9-1-ARCH (version gathered from pacman -Qi linux)
+
+This will load the correct kernel modules for the kernel version installed in your chroot installation.
+
+Regenerate your ramdisk
+
+    # mkinitcpio -p linux
+
+There should be no errors.
+
+== See also ==
+
 * [http://zfsonlinux.org/ ZFS on Linux]
 * [http://zfsonlinux.org/faq.html ZFS on Linux FAQ]
 * [http://www.freebsd.org/doc/en_US.ISO8859-1/books/handbook/filesystems-zfs.html FreeBSD Handbook -- The Z File System]
