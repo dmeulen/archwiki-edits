@@ -195,6 +195,32 @@ WantedBy=multi-user.target</nowiki>}}
 
 In addition to the method described previously, NetworkManager can also be configured to run a script on network status change.
 
-== Troubleshooting ==
-''There is a dedicated article [[NFS Troubleshooting]].''
+Enable the {{ic|NetworkManager-dispatch}} service.
 
+{{bc|# systemctl enable NetworkManager-dispatch
+# systemctl start NetworkManager-dispatch}}
+
+Next, create the mount handling script:
+
+{{hc|# nano /etc/NetworkManager/dispatcher.d/nfs.sh|<nowiki>#!/bin/bash
+
+SSID="CHANGE_ME"
+
+MOUNT_POINTS=`\grep nfs /etc/fstab | cut -f 1 | tr -s " " | cut -f 2 -d " "`
+
+ISNETUP=`nmcli dev wifi | \grep $SSID | tr -s ' ' | cut -f 10 -d ' '` 2>/dev/null
+
+# echo "$ISNETUP" >> /tmp/nm_dispatch_log
+
+if [[ "$ISNETUP" == "yes" ]]; then
+    for mntpnt in ${MOUNT_POINTS}; do
+        mountpoint -q $mntpnt || mount $mntpnt
+    done
+else
+    for srvexp in ${MOUNT_POINTS}; do
+        umount -l -f $srvexp &>/dev/null
+    done
+fi
+</nowiki>}}
+
+Now when the wireless SSID "CHANGE_ME" goes up or down, the {{ic|nfs.sh}} script will be called to mount or unmount the shares as soon as possible.
