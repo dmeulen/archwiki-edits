@@ -150,7 +150,7 @@ Create the {{ic|auto_share}} script that will be used by cron to check if the nf
 
 SERVER="lithium"
 
-MOUNT_POINTS=`\grep nfs /etc/fstab | cut -f 1 | tr -s " " | cut -f 2 -d " "`
+MOUNT_POINTS=`sed -e '/^.*#/d' -e '/^.*:/!d' -e 's/\t/ /g' /etc/fstab | tr -s " " | cut -f2 -d" "`
 
 ping -c 1 "${SERVER}" &>/dev/null
 
@@ -206,7 +206,7 @@ Next, create the mount handling script:
 
 SSID="CHANGE_ME"
 
-MOUNT_POINTS=`\grep nfs /etc/fstab | cut -f 1 | tr -s " " | cut -f 2 -d " "`
+MOUNT_POINTS=`sed -e '/^.*#/d' -e '/^.*:/!d' -e 's/\t/ /g' /etc/fstab | tr -s " " | cut -f2 -d" "`
 
 ISNETUP=`nmcli dev wifi | \grep $SSID | tr -s ' ' | cut -f 10 -d ' '` 2>/dev/null
 
