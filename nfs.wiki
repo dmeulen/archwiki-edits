@@ -224,3 +224,7 @@ fi
 </nowiki>}}
 
 Now when the wireless SSID "CHANGE_ME" goes up or down, the {{ic|nfs.sh}} script will be called to mount or unmount the shares as soon as possible.
+
+== Troubleshooting ==
+
+There is a dedicated article [[NFS Troubleshooting]].
