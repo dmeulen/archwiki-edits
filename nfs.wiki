@@ -201,7 +201,11 @@ Enable the {{ic|NetworkManager-dispatch}} service.
 {{bc|# systemctl enable NetworkManager-dispatch
 # systemctl start NetworkManager-dispatch}}
 
-Next, create the mount handling script:
+The easiest method for mount shares on network status change is to just symlink to the {{ic|auto_share}} script:
+
+{{bc|# ln -s /root/bin/auto_share /etc/NetworkManager/dispatcher.d/30_nfs.sh }}
+
+Or use the following mounting script that checks for network availability:
 
 {{hc|# nano /etc/NetworkManager/dispatcher.d/30_nfs.sh|<nowiki>#!/bin/bash
 
