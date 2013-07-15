@@ -130,6 +130,71 @@ Either export the share with the {{ic|insecure}} flag, and mount using Finder:
 Or, mount the share using a secure port using the terminal:
 {{bc|# sudo mount -t nfs -o resvport servername:/srv/nfs4 /Volumes/servername}}
 
+== Tips and tricks ==
+
+=== Automatic mount handling ===
+
+This trick is useful for laptops that require nfs shares from a local wireless network. If the nfs host becomes unreachable, the nfs share will be unmounted to hopefully prevent system hangs when using the hard mount option.
+
+See https://bbs.archlinux.org/viewtopic.php?pid=1260240#p1260240
+
+Make sure that the nfs mount points are correctly indicated in {{ic|/etc/fstab}}:
+
+{{hc|$ cat /etc/fstab|<nowiki>lithium:/mnt/data           /mnt/data	        nfs noauto,noatime,rsize=32768,wsize=32768,intr,hard 0 0
+lithium:/var/cache/pacman   /var/cache/pacman	nfs noauto,noatime,rsize=32768,wsize=32768,intr,hard 0 0</nowiki>
+}}
+
+Create the {{ic|auto_share}} script that will be used by cron to check if the nfs host is reachable,
+
+{{hc|# nano /root/bin/auto_share|<nowiki>#!/bin/bash
+
+SERVER="lithium"
+
+MOUNT_POINTS=`\grep nfs /etc/fstab | cut -f 1 | tr -s " " | cut -f 2 -d " "`
+
+ping -c 1 "${SERVER}" &>/dev/null
+
+if [ $? -ne 0 ]; then
+    # The server could not be reached, unmount the shares
+    for umntpnt in ${MOUNT_POINTS}; do
+        umount -l -f $umntpnt &>/dev/null
+    done
+else
+    # The server is up, make sure the shares are mounted
+    for mntpnt in ${MOUNT_POINTS}; do
+        mountpoint -q $mntpnt || mount $mntpnt
+    done
+fi
+</nowiki>}}
+
+{{bc|# chmod +x /root/bin/auto_share}}
+
+Create the root cron entry to run {{ic|auto_share}} every minute:
+
+{{hc|# crontab -e|<nowiki>
+* * * * * /root/bin/auto_share
+</nowiki>}}
+
+A systemd unit file can also be used to mount the nfs shares at startup. The unit file is not necessary if NetworkManager is installed and configured on the client system. See [[#NetworkManger dispatch]]
+
+{{hc|$ cat /etc/systemd/system/auto_share.service|<nowiki>
+[Unit]
+Description=NFS automount
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/root/bin/auto_share
+
+[Install]
+WantedBy=multi-user.target</nowiki>}}
+
+{{bc|# systemctl enable auto_share}}
+
+==== NetworkManger dispatch ====
+
+In addition to the method described previously, NetworkManager can also be configured to run a script on network status change.
+
 == Troubleshooting ==
 ''There is a dedicated article [[NFS Troubleshooting]].''
 
