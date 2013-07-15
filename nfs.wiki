@@ -1,0 +1,135 @@
+[[Category:Networking]]
+[[ar:NFS]]
+[[de:Network File System]]
+[[es:NFS]]
+[[fr:NFS]]
+[[it:NFSv4]]
+[[zh-CN:NFS]]
+{{Article summary start}}
+{{Article summary text|Article covers configuration of NFSv4 which is an open standard network file sharing protocol.}}
+{{Article summary heading|Related}}
+{{Article summary wiki|NFS Troubleshooting}} - Dedicated article for common problems and solutions.
+{{Article summary wiki|NFSv3}} - Deprecated v3 format.
+{{Article summary end}}
+From [[Wikipedia: Network File System|Wikipedia]]: 
+:''Network File System (NFS) is a distributed file system protocol originally developed by Sun Microsystems in 1984, allowing a user on a client computer to access files over a network in a manner similar to how local storage is accessed.''
+
+==Installing==
+Both client and server only require the [[Pacman|installation]] of the {{Pkg|nfs-utils}} package.
+
+{{Note|It is HIGHLY recommended to use a time sync daemon on ALL nodes of your network to keep client/server clocks in sync.  Without accurate clocks on all nodes, NFS can introduce unwanted delays! The [[NTP]] system is recommended to sync both the server and the clients to the highly accurate NTP servers available on the Internet.}}
+
+==Configuration==
+
+===Server===
+==== ID mapping ====
+Edit {{ic|/etc/idmapd.conf}} and set the {{ic|Domain}} field to your domain name.
+
+{{hc|/etc/idmapd.conf|<nowiki>
+[General]
+ 
+Verbosity = 1
+Pipefs-Directory = /var/lib/nfs/rpc_pipefs
+Domain = atomic
+
+[Mapping]
+
+Nobody-User = nobody
+Nobody-Group = nobody
+</nowiki>}}
+==== File system ====
+{{Note|For security reasons, it is recommended to use an NFS export root which will keep users limited to that mount point only.  The following example illustrates this concept.}}
+
+Define any NFS shares in {{ic|/etc/exports}} which are relative to the NFS root.  In this example, the NFS root will be {{ic|/srv/nfs4}} and we will be sharing {{ic|/mnt/music}}.
+
+{{bc|# mkdir -p /srv/nfs4/music}}
+
+Read/Write permissions must be set on the music directory so clients may write to it. 
+
+Now mount the actual target share, {{ic|/mnt/music}} to the NFS share via the mount command:
+
+{{bc|# mount --bind /mnt/music /srv/nfs4/music}}
+
+To make it stick across server reboots, add the bind mount to {{ic|fstab}}:
+{{hc|/etc/fstab|
+/mnt/music /srv/nfs4/music  none   bind   0   0
+}}
+
+==== Exports ====
+Add directories to be shared and an ip address or hostname(s) of client machines that will be allowed to mount them in {{ic|exports}}:
+{{hc|/etc/exports|<nowiki>
+/srv/nfs4/ 192.168.0.1/24(rw,fsid=root,no_subtree_check)
+/srv/nfs4/music 192.168.0.1/24(rw,no_subtree_check,nohide) # note the nohide option which is applied to mounted directories on the file system.
+</nowiki>}}
+
+Users need-not open the share to the entire subnet; one can specify a single IP address or hostname as well.
+
+For more information about all available options see {{ic|man 5 exports}}.
+
+If you modify {{ic|/etc/exports}} while the server is running, you must re-export them for changes to take effect:
+{{bc|# exportfs -ra}}
+
+====Starting the server====
+
+[[Daemons|Start/enable]] {{ic|rpc-idmapd.service}} and {{ic|rpc-mountd.service}}.  Note that these units require other services, which are launched automatically by [[systemd]].
+
+===Client===
+Clients need {{Pkg|nfs-utils}} to connect, but no special setup is required when connecting to NFS 4 servers.
+
+====Mounting from Linux====
+Show the server's exported filesystems:
+{{bc|$ showmount -e servername}}
+
+Then mount omitting the server's NFS export root: 
+{{bc|# mount -t nfs4 servername:/music /mountpoint/on/client}}
+
+=====/etc/fstab Settings=====
+Using [[fstab]] is useful for a server which is always on, and the NFS shares are available whenever the client boots up. Edit {{ic|/etc/fstab}} file, and add an appropriate line reflecting the setup. Again, the server's NFS export root is omitted.
+{{hc|/etc/fstab|<nowiki>
+servername:/music   /mountpoint/on/client   nfs4   rsize=8192,wsize=8192,timeo=14,intr,_netdev	0 0
+</nowiki>}}
+
+{{Note|Additional mount options can be specified here. Consult the NFS man page for further information.}}
+Some additional mount options to consider are include:
+
+* {{ic|1=rsize=8192}} and {{ic|1=wsize=8192}}
+* {{ic|1=timeo=14}}
+* {{ic|1=intr}}
+* {{ic|1=_netdev}}
+
+The {{ic|rsize}} value is the number of bytes used when reading from the server. The {{ic|wsize}} value is the number of bytes used when writing to the server. The default for both is 1024, but using higher values such as 8192 can improve throughput.  This is not universal.  It is recommended to test after making this change.
+
+The {{ic|timeo}} value is the amount of time, in tenths of a second, to wait before resending a transmission after an RPC timeout. After the first timeout, the timeout value is doubled for each retry for a maximum of 60 seconds or until a major timeout occurs. If connecting to a slow server or over a busy network, better performance can be achieved by increasing this timeout value. 
+
+The {{ic|intr}} option allows signals to interrupt the file operation if a major timeout occurs for a hard-mounted share.
+
+The {{ic|_netdev}} option tells the system to wait until the network is up before trying to mount the share. systemd assumes this for NFS, but anyway it is good practice to use it for all types of networked filesystems
+
+=====Using autofs=====
+Using [[autofs]] is useful when multiple machines want to connect via NFS; they could both be clients as well as servers. The reason this method is preferable over the earlier one is that if the server is switched off, the client will not throw errors about being unable to find NFS shares. See [[autofs#NFS Network mounts]] for details.
+
+==== Mounting from Windows ====
+{{note|Only the Ultimate and Enterprise editions of Windows 7 and the Enterprise edition of Windows 8 include "Client for NFS".}}
+NFS shares can be mounted from Windows if the "Client for NFS" service is activated (which it is not by default).
+To install the service go to "Programs and features" in the Control Panel and click on "Turn Windows features on or off". Locate "Services for NFS" and activate it as well as both subservices ("Administrative tools" and "Client for NFS").
+
+Some global options can be set by opening the "Services for Network File System" (locate it with the search box) and right click on client->properties. 
+
+{{Warning|Serious performance issues may occur (it randomly takes 30-60 seconds to display a folder, 2 MB/s file copy speed on gigabit LAN, ...) to which Microsoft does not have a solution yet.[https://social.technet.microsoft.com/Forums/en-CA/w7itpronetworking/thread/40cc01e3-65e4-4bb6-855e-cef1364a60ac]}}
+
+To mount a share using Explorer:
+
+{{ic|Computer}} > {{ic|Map network drive}} > {{ic|servername:/srv/nfs4/music}}
+
+==== Mounting from OS X ====
+{{note|OS X by default uses an insecure (>1024) port to mount a share.}}
+Either export the share with the {{ic|insecure}} flag, and mount using Finder:
+
+{{ic|Go}} > {{ic|Connect to Server}} > {{ic|nfs://servername/}}
+
+Or, mount the share using a secure port using the terminal:
+{{bc|# sudo mount -t nfs -o resvport servername:/srv/nfs4 /Volumes/servername}}
+
+== Troubleshooting ==
+''There is a dedicated article [[NFS Troubleshooting]].''
+
